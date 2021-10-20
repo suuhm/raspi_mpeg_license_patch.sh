@@ -16,10 +16,10 @@
 HS=1D #> 0x1d
 START_ELF=/flash/start.elf
 
-echo "_______________________________________________"
+echo "___________________________________________________"
 echo ""
-echo "- fuk-mpeg-lic-activator v0.1 - (c)2021 suuhm -"
-echo "_______________________________________________"
+echo "- raspi_mpeg_patch-companion v0.2 - (c)2021 suuhm -"
+echo "___________________________________________________"
 echo
 
 echo "* First check mpeg2/vc activated?"
