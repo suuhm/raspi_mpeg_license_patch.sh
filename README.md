@@ -1,17 +1,27 @@
 # raspi_mpeg_patch-companion.sh
-Simple helper script and PoC to patch forgotten mpeg2 &amp; and vc codecs on raspberry pi
+Simple helper script and PoC to patch forgotten mpeg2 &amp; and vc codecs licenses on raspberry pi
 
 ### BASED AS SHELL Proof of Conecpt and HELPER ON:
 https://github.com/nucular/raspi-keygen
 
+<br/>
 
-#### Testet on libreelec 9x & raspbian (Rpi1 -3)
+## How to run the script:
+Simply run this onliner: 
+```
+wget https://raw.githubusercontent.com/suuhm/raspi_mpeg_patch-companion.sh/main/raspi_mpeg_patch-companion.sh -qO- | bash -s -- --patch-now
+```
+and Reboot your Raspi.
+
+<br/>
+
+## Tested on libreelec 9x & raspbian (Rpi1 -3)
 #### Functions:
 - ```--check-only``` Only checking if yet patched
 - ```--patch-now``` To Patch the system
 - ```--reset-to-original``` Reset the start.elf to original state
 
-On Raspian and other OS you have to replace ```START_ELF=/flash/start.elf``` with ```START_ELF=/boot/start.elf``` or something else keep in mind some directories can be variable!
+On Raspbian and other OS you have to replace ```START_ELF=/flash/start.elf``` with ```START_ELF=/boot/start.elf``` or something else keep in mind some directories can be variable!
 
 
 ## !!!! IMPORTANT NOTE !!!!
