@@ -50,10 +50,9 @@ if [[ "$1" == "--check-only" ]]; then
         echo "* get GPUtemp every 5 secs..."
         while true; do gputemp; sleep 5; done
         # bcmstat.sh d 23
-        exit
-fi
-
-if [[ "$1" == "--patch-now" ]]; then
+        exit 0
+        
+elif [[ "$1" == "--patch-now" ]]; then
         mount -o remount,rw /flash
         # nano /flash/config.txt
         # decode_MPG2=0xa7fc0fff
@@ -70,9 +69,8 @@ if [[ "$1" == "--patch-now" ]]; then
         echo "Old md5sum: $(md5sum $START_ELF.BACKUP)"
         echo
         echo "* Now, pls restart your device and check again."
-fi
-
-if [[ "$1" == "--reset-to-original" ]]; then
+        
+elif [[ "$1" == "--reset-to-original" ]]; then
         mount -o remount,rw /flash
         echo "* Reset now..."
         if [[ -e $START_ELF.BACKUP ]]; then
@@ -89,6 +87,10 @@ if [[ "$1" == "--reset-to-original" ]]; then
         echo "Old Patched File md5sum: $(md5sum $START_ELF.PATCHED)"
         echo
         echo "* Now, pls restart your device and check again."
+
+else 
+        echo ; echo "* No Arguments set: $0 [--check-only | --patch-now | --reset-to-original]"
+        exit 1
 fi
 
 exit 0
