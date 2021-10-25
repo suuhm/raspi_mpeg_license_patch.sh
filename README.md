@@ -1,5 +1,5 @@
 # raspi_mpeg_patch-companion.sh
-Simple helper script and PoC to patch forgotten mpeg2 &amp; and vc codecs licenses on raspberry pi
+Simple hack & proof of concept script to activate forgotten mpeg2 & and vc codec licenses on raspberry pi 
 
 ### BASED AS SHELL Proof of Conecpt and HELPER ON:
 https://github.com/nucular/raspi-keygen
@@ -7,11 +7,11 @@ https://github.com/nucular/raspi-keygen
 <br/>
 
 ## How to run the script:
-Simply run this onliner: 
+Simply run this one-liner: 
 ```
 wget https://raw.githubusercontent.com/suuhm/raspi_mpeg_patch-companion.sh/main/raspi_mpeg_patch-companion.sh -qO- | bash -s -- --patch-now
 ```
-and Reboot your Raspi.
+and reboot your Raspi.
 
 <br/>
 
