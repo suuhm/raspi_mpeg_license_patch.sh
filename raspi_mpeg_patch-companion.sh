@@ -6,14 +6,19 @@
 # !!!! IMPORTANT NOTE !!!!
 # PLEASE BUY THE LICENSES - THIS IS JUST FOR RECOVER CASES!!!
 #
-# Testet on libreelec 9x & raspbian (Rpi1 -3)
+# Tested on libreelec 9x & raspbian (Rpi1 -3)
 #
 # SEE MORE:
 # https://codecs.raspberrypi.org/mpeg-2-license-key/
 #
 # Setting up here the wished replacing Hexstring
-#HS=x3C
+# On older Raspberry FW use this string here: 0x3C
+#HS=3C
 HS=1D #> 0x1d
+
+# On Raspian uncomment this line:
+#START_ELF=/boot/start.elf
+# On libreElec uncomment this line:
 START_ELF=/flash/start.elf
 
 echo "___________________________________________________"
@@ -64,7 +69,7 @@ elif [[ "$1" == "--patch-now" ]]; then
         cp -a $START_ELF $START_ELF.BACKUP
         /storage/perl -pne "s/\x47\xE9362H\x$HS\x18/\x47\xE9362H\x$HS\x1F/g" < $START_ELF.BACKUP > $START_ELF
 
-        echo "* Finished success"
+        echo "* Finished. success"
         echo "New md5sum: $(md5sum $START_ELF)"
         echo "Old md5sum: $(md5sum $START_ELF.BACKUP)"
         echo
@@ -82,7 +87,7 @@ elif [[ "$1" == "--reset-to-original" ]]; then
                 /storage/perl -pne "s/\x47\xE9362H\x$HS\x1F/\x47\xE9362H\x$HS\x18/g" < $START_ELF.PATCHED > $START_ELF
         fi
 
-        echo "* Finished success"
+        echo "* Finished. success"
         echo "New original md5sum: $(md5sum $START_ELF)"
         echo "Old Patched File md5sum: $(md5sum $START_ELF.PATCHED)"
         echo
