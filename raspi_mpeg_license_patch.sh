@@ -23,7 +23,7 @@ START_ELF=/flash/start.elf
 
 echo "___________________________________________________"
 echo ""
-echo "- raspi_mpeg_patch-companion v0.2 - (c)2021 suuhm -"
+echo "-- raspi_mpeg_license_patch v0.2 - (c)2021 suuhm --"
 echo "___________________________________________________"
 echo
 
