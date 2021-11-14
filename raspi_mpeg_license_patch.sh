@@ -16,48 +16,91 @@
 #HS=3C
 HS=1D #> 0x1d
 
-# On Raspian uncomment this line:
-#START_ELF=/boot/start.elf
-# On libreElec uncomment this line:
-START_ELF=/flash/start.elf
+function _get_tools() {
+        echo "* Getting some necessary tools, maybe this take some time..."
+        mkdir -p /storage/sr-tools
+        find / | grep -i -E "bin/xxd$|bin/perl$" | xargs -I Z cp Z /storage/sr-tools
+        PATH=$PATH:/storage/sr-tools
+        #ln -s /storage/{xxd,perl} /storage/.kodi/addons/service.ttyd/bin/
+        #cp -ra /var/media/root/usr/bin/{xxd,perl}/storage/
+}
 
-echo "___________________________________________________"
-echo ""
-echo "-- raspi_mpeg_license_patch v0.2 - (c)2021 suuhm --"
-echo "___________________________________________________"
-echo
+function _check4patched() {
+        _get_tools
+        echo "* First check mpeg2/vc activated?"
+        vcgencmd codec_enabled MPG2
+        vcgencmd codec_enabled WVC1
+        sleep 3 && echo
 
-echo "* First check mpeg2/vc activated?"
-vcgencmd codec_enabled MPG2
-vcgencmd codec_enabled WVC1
-sleep 3 && echo
-echo "* Getting some necessary tools.."
-cp /var/media/root/usr/bin/xxd /storage/
-cp /var/media/root/usr/bin/perl /storage/
+        echo
+        echo "* Getting Hexstring... May take some time..."
+        echo
+        HS=$(xxd $START_ELF | grep -i "47 *E9 *33 *36 *32 *48" | sed -re 's/.*47\ *e9\ *33\ *36\ *32\ *48\ (..)(18|1f)\ .*/\1/')
+        HT=$(xxd $START_ELF | grep -i "47 *E9 *33 *36 *32 *48" | sed -re "s/.*47\ *e9\ *33\ *36\ *32\ *48\ $HS(..)\ .*/\1/")
 
-echo
-echo "* Getting Hexstring... May take some time..."
-echo
-HS=$(/storage/xxd /flash/start.elf | grep -i "47E9 3336 3248" | sed -re 's/.*47e9\ 3336\ 3248\ (..)(18|1f)\ .*/\1/')
-HT=$(/storage/xxd /flash/start.elf | grep -i "47E9 3336 3248" | sed -re "s/.*47e9\ 3336\ 3248\ $HS(..)\ .*/\1/")
+        if [[ ! "$1" == "--check-only" ]]; then
+                if [[ $HT == "1f" ]]; then
+                        echo "* Already Patched"
+                        sleep 4 && exit 0;
+                else
+                        echo "* Not patched continue..."
+                        sleep 2
+                fi
+        else
+                if [[ $HT == "1f" ]]; then
+                        echo "* Already Patched"
+                else
+                        echo "* Not patched!"
+                        sleep 2
+                fi  
+        fi
+}
 
-if [[ $HT == "1f" ]]; then
-        echo "* Already Patched"
-else
-        echo "* Not patched continue..."
-        sleep 2
-fi
+function _get_startelf() {
+        if [[ -f /boot/start.elf && "$2" == "--os=raspian" ]]; then
+                # On Raspian:
+                START_ELF=/boot/start.elf
+        elif [[ -f /flash/start.elf && "$2" == "--os=libreelec" ]]; then
+                # On libreElec:
+                START_ELF=/flash/start.elf
+                _get_tools
+        elif [[ -f /boot/start_x.elf && "$2" == "--os=osmc" ]]; then
+                # On OSMC:
+                START_ELF=/boot/start_x.elf
+                _get_tools
+        elif [[ -f /boot/start.elf && "$2" == "--os=xbian" ]]; then
+                # On Xbian
+                START_ELF=/boot/start.elf
+                _get_tools
+        else
+                echo "START.ELF not found searching possible file:"
+                find / | grep -i -E "start.*.elf"
+                echo -e "\nPlease enter the full Path to the START.ELF: "
+                read START_ELF
+                _get_tools
+        fi
+}
+
+echo "   ___________________________________________________ "
+echo "  |---------------------------------------------------|"
+echo "  | raspi_mpeg_license_patch v0.3b - (c)2021 suuhm    |"
+echo "  |___________________________________________________|"
+echo "                                                       "
 
 if [[ "$1" == "--check-only" ]]; then
-        echo -e "\n* Check state xxd.."
-        /storage/xxd $START_ELF | grep -i -B 1 -A 1 "47E9 3336 3248"
-        echo
+        _get_startelf
+        _check4patched
+        echo -e "\n\n* Check state xxd.."
+        xxd $START_ELF | grep -i -B 1 -A 1 "47 *E9 *33 *36 *32 *48"
+        echo ""
         echo "* get GPUtemp every 5 secs..."
         while true; do gputemp; sleep 5; done
         # bcmstat.sh d 23
         exit 0
         
 elif [[ "$1" == "--patch-now" ]]; then
+        _get_startelf
+        _check4patched
         mount -o remount,rw /flash
         # nano /flash/config.txt
         # decode_MPG2=0xa7fc0fff
@@ -67,15 +110,17 @@ elif [[ "$1" == "--patch-now" ]]; then
         echo "* set up patch now..."
         #cd /boot
         cp -a $START_ELF $START_ELF.BACKUP
-        /storage/perl -pne "s/\x47\xE9362H\x$HS\x18/\x47\xE9362H\x$HS\x1F/g" < $START_ELF.BACKUP > $START_ELF
+        perl -pne "s/\x47\xE9362H\x$HS\x18/\x47\xE9362H\x$HS\x1F/g" < $START_ELF.BACKUP > $START_ELF
 
         echo "* Finished. success"
         echo "New md5sum: $(md5sum $START_ELF)"
         echo "Old md5sum: $(md5sum $START_ELF.BACKUP)"
-        echo
+        echo ""
         echo "* Now, pls restart your device and check again."
         
 elif [[ "$1" == "--reset-to-original" ]]; then
+        _get_startelf
+        _check4patched
         mount -o remount,rw /flash
         echo "* Reset now..."
         if [[ -e $START_ELF.BACKUP ]]; then
@@ -84,7 +129,7 @@ elif [[ "$1" == "--reset-to-original" ]]; then
         else
                 echo "* Patching Back"
                 cp -a $START_ELF $START_ELF.PATCHED
-                /storage/perl -pne "s/\x47\xE9362H\x$HS\x1F/\x47\xE9362H\x$HS\x18/g" < $START_ELF.PATCHED > $START_ELF
+                perl -pne "s/\x47\xE9362H\x$HS\x1F/\x47\xE9362H\x$HS\x18/g" < $START_ELF.PATCHED > $START_ELF
         fi
 
         echo "* Finished. success"
@@ -94,7 +139,7 @@ elif [[ "$1" == "--reset-to-original" ]]; then
         echo "* Now, pls restart your device and check again."
 
 else 
-        echo ; echo "* No Arguments set: $0 [--check-only | --patch-now | --reset-to-original]"
+        echo ; echo "* No Arguments set: $0 [--check-only | --patch-now | --reset-to-original] [--os=<raspian|libreelec|osmc|xbian>]"
         exit 1
 fi
 
