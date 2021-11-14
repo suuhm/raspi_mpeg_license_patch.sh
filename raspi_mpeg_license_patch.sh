@@ -26,7 +26,7 @@ function _get_tools() {
 }
 
 function _check4patched() {
-        _get_tools
+        #_get_tools
         echo "* First check mpeg2/vc activated?"
         vcgencmd codec_enabled MPG2
         vcgencmd codec_enabled WVC1
@@ -87,19 +87,27 @@ echo "  |  raspi_mpeg_license_patch v0.3b - (c)2021 suuhm    |"
 echo "  |____________________________________________________|"
 echo "                                                        "
 
+#if [[ $2 && "$2" =~ \-\-\o\s\=[a-z]*$ ]]; then
+#unknown =~ Regex operator in BusyBox v1.31.0 bash? ash-shell / 
+if [[ $2 ]]; then
+        _OS=$2
+        _COM=$1
+fi
+
 if [[ "$1" == "--check-only" ]]; then
-        _get_startelf
+        _get_startelf $_COM $_OS
         _check4patched
         echo -e "\n\n* Check state xxd.."
         xxd $START_ELF | grep -i -B 1 -A 1 "47 *E9 *33 *36 *32 *48"
         echo ""
         echo "* get GPUtemp every 5 secs..."
         while true; do gputemp; sleep 5; done
+        # libreelec some more stats pls uncomment here:
         # bcmstat.sh d 23
         exit 0
         
 elif [[ "$1" == "--patch-now" ]]; then
-        _get_startelf
+        _get_startelf $_COM $_OS
         _check4patched
         mount -o remount,rw /flash
         # nano /flash/config.txt
@@ -119,7 +127,7 @@ elif [[ "$1" == "--patch-now" ]]; then
         echo "* Now, pls restart your device and check again."
         
 elif [[ "$1" == "--reset-to-original" ]]; then
-        _get_startelf
+        _get_startelf $_COM $_OS
         _check4patched
         mount -o remount,rw /flash
         echo "* Reset now..."
@@ -139,7 +147,8 @@ elif [[ "$1" == "--reset-to-original" ]]; then
         echo "* Now, pls restart your device and check again."
 
 else 
-        echo ; echo "* No Arguments set: $0 [--check-only | --patch-now | --reset-to-original] [--os=<raspian|libreelec|osmc|xbian>]"
+        echo -e "\n* No Arguments set: "
+        echo -e "\n* Usage: $0 [--check-only | --patch-now | --reset-to-original] [--os=<raspian|libreelec|osmc|xbian>]\n"
         exit 1
 fi
 
