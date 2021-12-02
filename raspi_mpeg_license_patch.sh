@@ -20,7 +20,16 @@ function _get_tools() {
         echo "* Getting some necessary tools, maybe this take some time..."
         mkdir -p /storage/sr-tools
         find / | grep -i -E "bin/xxd$|bin/perl$" | xargs -I Z cp Z /storage/sr-tools
+        
         PATH=$PATH:/storage/sr-tools
+        
+        if [[ ! $(command -v xxd) ]]; then
+                echo "xxd not found, but not neccessary for patching only.."
+        fi
+        
+        if [[ ! $(command -v perl) ]]; then
+                echo "perl not found, but not neccessary for checking only.."
+        fi
         #ln -s /storage/{xxd,perl} /storage/.kodi/addons/service.ttyd/bin/
         #cp -ra /var/media/root/usr/bin/{xxd,perl}/storage/
 }
@@ -35,8 +44,16 @@ function _check4patched() {
         echo
         echo "* Getting Hexstring... May take some time..."
         echo
-        HS=$(xxd $START_ELF | grep -i "47 *E9 *33 *36 *32 *48" | sed -re 's/.*47\ *e9\ *33\ *36\ *32\ *48\ (..)(18|1f)\ .*/\1/')
-        HT=$(xxd $START_ELF | grep -i "47 *E9 *33 *36 *32 *48" | sed -re "s/.*47\ *e9\ *33\ *36\ *32\ *48\ $HS(..)\ .*/\1/")
+        if [[ $(command -v xxd) ]]; then
+                HS=$(xxd $START_ELF | grep -i "47 *E9 *33 *36 *32 *48" | sed -re 's/.*47\ *e9\ *33\ *36\ *32\ *48\ (..)(18|1f)\ .*/\1/')
+                HT=$(xxd $START_ELF | grep -i "47 *E9 *33 *36 *32 *48" | sed -re "s/.*47\ *e9\ *33\ *36\ *32\ *48\ $HS(..)\ .*/\1/")
+        else
+                echo "xxd not found, trying to patch with 0x1D ? "
+                echo "If unsure please install xxd and stop now. continue? (y/n) :"
+                read yn
+                if [[ $yn != "y" && $yn != "yes" ]]; then
+                        exit 1;
+                fi
 
         if [[ ! "$1" == "--check-only" ]]; then
                 if [[ $HT == "1f" ]]; then
@@ -57,8 +74,8 @@ function _check4patched() {
 }
 
 function _get_startelf() {
-        if [[ -f /boot/start.elf && "$2" == "--os=raspian" ]]; then
-                # On Raspian:
+        if [[ -f /boot/start.elf && "$2" == "--os=raspbian" ]]; then
+                # On Raspbian:
                 START_ELF=/boot/start.elf
         elif [[ -f /flash/start.elf && "$2" == "--os=libreelec" ]]; then
                 # On libreElec:
@@ -109,28 +126,39 @@ if [[ "$1" == "--check-only" ]]; then
 elif [[ "$1" == "--patch-now" ]]; then
         _get_startelf $_COM $_OS
         _check4patched
-        mount -o remount,rw /flash
+        mount -o remount,rw $(dirname $START_ELF)
         # nano /flash/config.txt
         # decode_MPG2=0xa7fc0fff
         # decode_WVC1=0x6d1feeff
         # decode_DTS=0x00000000
         # decode_DDP=0x00000000
         echo "* set up patch now..."
-        #cd /boot
+        
+        if [[ ! $(command -v perl) ]]; then
+                echo "perl not found, exit"
+                exit 1
+        fi
         cp -a $START_ELF $START_ELF.BACKUP
         perl -pne "s/\x47\xE9362H\x$HS\x18/\x47\xE9362H\x$HS\x1F/g" < $START_ELF.BACKUP > $START_ELF
 
         echo "* Finished. success"
         echo "New md5sum: $(md5sum $START_ELF)"
         echo "Old md5sum: $(md5sum $START_ELF.BACKUP)"
+        mount -o remount,ro $(dirname $START_ELF)
+        sleep 2
         echo ""
         echo "* Now, pls restart your device and check again."
         
 elif [[ "$1" == "--reset-to-original" ]]; then
         _get_startelf $_COM $_OS
         _check4patched
-        mount -o remount,rw /flash
+        mount -o remount,rw $(dirname $START_ELF)
         echo "* Reset now..."
+        
+        if [[ ! $(command -v perl) ]]; then
+                echo "perl not found, exit"
+                exit 1
+        fi
         if [[ -e $START_ELF.BACKUP ]]; then
                 echo "* Take old file.. $START_ELF.BACKUP"
                 cp -a $START_ELF.BACKUP $START_ELF
@@ -143,12 +171,14 @@ elif [[ "$1" == "--reset-to-original" ]]; then
         echo "* Finished. success"
         echo "New original md5sum: $(md5sum $START_ELF)"
         echo "Old Patched File md5sum: $(md5sum $START_ELF.PATCHED)"
+        mount -o remount,ro $(dirname $START_ELF)
+        sleep 2
         echo
         echo "* Now, pls restart your device and check again."
 
 else 
         echo -e "\n* No Arguments set: "
-        echo -e "\n* Usage: $0 [--check-only | --patch-now | --reset-to-original] [--os=<raspian|libreelec|osmc|xbian>]\n"
+        echo -e "\n* Usage: $0 [--check-only | --patch-now | --reset-to-original] [--os=<raspbian|libreelec|osmc|xbian>]\n"
         exit 1
 fi
 
