@@ -13,7 +13,7 @@ wget https://raw.githubusercontent.com/suuhm/raspi_mpeg_license_patch.sh/main/ra
 ```
 <br/>
 
-You can also easily patch/check with the additional ```--os=<raspian|libreelec|osmc|xbian>``` parameters if you want to specificate your Raspi-Enviroment.
+You can also easily patch/check with the additional ```--os=<raspbian|libreelec|osmc|xbian>``` parameters if you want to specificate your Raspi-Enviroment.
 #### For Example, if you want to patch libreElec:
 ```raspi_mpeg_license_patch.sh --patch-now --os=libreelec```
 <br/>
