@@ -19,9 +19,14 @@ HS=1D #> 0x1d
 function _get_tools() {
         echo "* Getting some necessary tools, maybe this take some time..."
         mkdir -p /storage/sr-tools
-        find / | grep -i -E "bin/xxd$|bin/perl$" | xargs -I Z cp Z /storage/sr-tools
+        export PATH=$PATH:/storage/sr-tools
         
-        PATH=$PATH:/storage/sr-tools
+        if [[ $(command -v xxd) ]] && [[ $(command -v perl) ]]; then
+                echo "Tools already just here, continue..."
+                return 1
+        fi
+        
+        find / | grep -i -E "bin/xxd$|bin/perl$" | xargs -I Z cp Z /storage/sr-tools
         
         if [[ ! $(command -v xxd) ]]; then
                 echo "xxd not found, but not neccessary for patching only.."
@@ -54,6 +59,7 @@ function _check4patched() {
                 if [[ $yn != "y" && $yn != "yes" ]]; then
                         exit 1;
                 fi
+        fi
 
         if [[ ! "$1" == "--check-only" ]]; then
                 if [[ $HT == "1f" ]]; then
@@ -90,8 +96,10 @@ function _get_startelf() {
                 START_ELF=/boot/start.elf
                 _get_tools
         else
-                echo "START.ELF not found searching possible file:"
+                echo "START.ELF not found. Searching for possible files:"
+                echo -e "---------------------------------------------\n"
                 find / | grep -i -E "start.*.elf"
+                echo -e "\n---------------------------------------------"
                 echo -e "\nPlease enter the full Path to the START.ELF: "
                 read START_ELF
                 _get_tools
@@ -114,10 +122,10 @@ fi
 if [[ "$1" == "--check-only" ]]; then
         _get_startelf $_COM $_OS
         _check4patched
-        echo -e "\n\n* Check state xxd.."
+        echo -e "\n\n* Check state xxd location +/- 1 line:"
         xxd $START_ELF | grep -i -B 1 -A 1 "47 *E9 *33 *36 *32 *48"
         echo ""
-        echo "* get GPUtemp every 5 secs..."
+        echo "* get GPUtemp every 5 secs... (STOP with Ctrl+C)"
         while true; do gputemp; sleep 5; done
         # libreelec some more stats pls uncomment here:
         # bcmstat.sh d 23
