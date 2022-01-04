@@ -54,7 +54,7 @@ function _check4patched() {
                 HT=$(xxd $START_ELF | grep -i "47 *E9 *33 *36 *32 *48" | sed -re "s/.*47\ *e9\ *33\ *36\ *32\ *48\ $HS(..)\ .*/\1/")
         else
                 echo "xxd not found, trying to patch with 0x1D ? "
-                echo "If unsure please install xxd and stop now. continue? (y/n) :"
+                echo -n "If unsure please install xxd and stop now. continue? (y/n) : "
                 read yn
                 if [[ $yn != "y" && $yn != "yes" ]]; then
                         exit 1;
@@ -100,7 +100,7 @@ function _get_startelf() {
                 echo -e "---------------------------------------------\n"
                 find / | grep -i -E "start.*.elf"
                 echo -e "\n---------------------------------------------"
-                echo -e "\nPlease enter the full Path to the START.ELF: "
+                echo -en "\nPlease enter the full Path to the START.ELF: "
                 read START_ELF
                 _get_tools
         fi
@@ -121,7 +121,7 @@ fi
 
 if [[ "$1" == "--check-only" ]]; then
         _get_startelf $_COM $_OS
-        _check4patched
+        _check4patched $1
         echo -e "\n\n* Check state xxd location +/- 1 line:"
         xxd $START_ELF | grep -i -B 1 -A 1 "47 *E9 *33 *36 *32 *48"
         echo ""
@@ -133,7 +133,7 @@ if [[ "$1" == "--check-only" ]]; then
         
 elif [[ "$1" == "--patch-now" ]]; then
         _get_startelf $_COM $_OS
-        _check4patched
+        _check4patched $1
         mount -o remount,rw $(dirname $START_ELF)
         # nano /flash/config.txt
         # decode_MPG2=0xa7fc0fff
@@ -159,7 +159,7 @@ elif [[ "$1" == "--patch-now" ]]; then
         
 elif [[ "$1" == "--reset-to-original" ]]; then
         _get_startelf $_COM $_OS
-        _check4patched
+        _check4patched $1
         mount -o remount,rw $(dirname $START_ELF)
         echo "* Reset now..."
         
