@@ -61,7 +61,7 @@ function _check4patched() {
                 fi
         fi
 
-        if [[ ! "$1" == "--check-only" ]]; then
+        if [[ "$1" != "--check-only" && "$1" != "--reset-to-original" ]]; then
                 if [[ "$HT" == "1f" ]]; then
                         echo "[~] Already Patched (0x$HT)"
                         sleep 4 && exit 0;
@@ -122,7 +122,7 @@ fi
 if [[ "$1" == "--check-only" ]]; then
         _get_startelf $_COM $_OS
         _check4patched $1
-        echo -e "\n\n* Check state xxd location +/- 1 line:"
+        echo -e "\n[~] Check state xxd location +/- 1 line:"
         xxd $START_ELF | grep -Ei -B 1 -A 1 "47 *E9 *3(3|4) *36 *32 *48 *(3C|1D) *(18|1F)"
         echo ""
         
@@ -193,10 +193,10 @@ elif [[ "$1" == "--reset-to-original" ]]; then
                 exit 1
         fi
         if [[ -e $START_ELF.BACKUP ]]; then
-                echo "* Take old file.. $START_ELF.BACKUP"
+                echo -e "\n[*] Finding old file.. $START_ELF.BACKUP" ; sleep 2
                 cp -a $START_ELF.BACKUP $START_ELF
         else
-                echo "* Patching Back"
+                echo -e "\n[!] Backup files not found. Need for patching Back" ; sleep 2
                 cp -a $START_ELF $START_ELF.PATCHED
                 if [ $HS_MODE -eq 3 ]; then
                         echo "[~] Using old patch ($HS_MODE) -> legacy"
@@ -209,12 +209,12 @@ elif [[ "$1" == "--reset-to-original" ]]; then
                 fi
         fi
 
-        echo "[*] Finished. success"
+        echo -e "\n[*] Finished. success! \n"
         echo "New original md5sum: $(md5sum $START_ELF)"
         echo "Old Patched File md5sum: $(md5sum $START_ELF.PATCHED)"
+        
         mount -o remount,ro $(dirname $START_ELF)
-        sleep 2
-        echo
+        echo ; sleep 2
         echo "[!] Now, pls restart your device and check again."
         echo -n "Restart now? continue? (y/n) : "
         read yn
