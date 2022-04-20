@@ -206,6 +206,7 @@ elif [[ "$1" == "--reset-to-original" ]]; then
                         perl -pne "s/\x47\xE9\x3462H\x$HS\x1F/\x47\xE9\x3462H\x$HS\x18/g" < $START_ELF.BACKUP > $START_ELF
                 else
                         echo "[!] Something went wrong, exit now.." ; exit 3
+                fi
         fi
 
         echo "[*] Finished. success"
