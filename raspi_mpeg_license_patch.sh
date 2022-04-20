@@ -50,8 +50,8 @@ function _check4patched() {
         echo "* Getting Hexstring... May take some time..."
         echo
         if [[ $(command -v xxd) ]]; then
-                HS=$(xxd $START_ELF | grep -i "47 *E9 *33 *36 *32 *48" | sed -re 's/.*47\ *e9\ *33\ *36\ *32\ *48\ (..)(18|1f)\ .*/\1/')
-                HT=$(xxd $START_ELF | grep -i "47 *E9 *33 *36 *32 *48" | sed -re "s/.*47\ *e9\ *33\ *36\ *32\ *48\ $HS(..)\ .*/\1/")
+                HS=$(xxd $START_ELF | grep -Ei "47 *E9 *3(3|4) *36 *32 *48 *(3C|1D) *18" | sed -re 's/.*47\ *e9\ *3(3|4)\ *36\ *32\ *48\ (1d|3c)(18|1f)\ .*/\2/')
+                HT=$(xxd $START_ELF | grep -Ei "47 *E9 *3(3|4) *36 *32 *48 *(3C|1D) *18" | sed -re 's/.*47\ *e9\ *3(3|4)\ *36\ *32\ *48\ $HS(..)\ .*/\2/')
         else
                 echo "xxd not found, trying to patch with 0x1D ? "
                 echo -n "If unsure please install xxd and stop now. continue? (y/n) : "
@@ -63,17 +63,17 @@ function _check4patched() {
 
         if [[ ! "$1" == "--check-only" ]]; then
                 if [[ $HT == "1f" ]]; then
-                        echo "* Already Patched"
+                        echo "* Already Patched (0x$HT)"
                         sleep 4 && exit 0;
                 else
-                        echo "* Not patched continue..."
+                        echo "* Not patched (0x$HT) continue..."
                         sleep 2
                 fi
         else
                 if [[ $HT == "1f" ]]; then
-                        echo "* Already Patched"
+                        echo "* Already Patched (0x$HT)"
                 else
-                        echo "* Not patched!"
+                        echo "* Not patched! (0x$HT)"
                         sleep 2
                 fi  
         fi
@@ -123,7 +123,7 @@ if [[ "$1" == "--check-only" ]]; then
         _get_startelf $_COM $_OS
         _check4patched $1
         echo -e "\n\n* Check state xxd location +/- 1 line:"
-        xxd $START_ELF | grep -i -B 1 -A 1 "47 *E9 *33 *36 *32 *48"
+        xxd $START_ELF | grep -Ei -B 1 -A 1 "47 *E9 *3(3|4) *36 *32 *48 *(3C|1D)"
         echo ""
         echo "* get GPUtemp every 5 secs... (STOP with Ctrl+C)"
         while true; do gputemp; sleep 5; done
@@ -148,6 +148,8 @@ elif [[ "$1" == "--patch-now" ]]; then
         fi
         cp -a $START_ELF $START_ELF.BACKUP
         perl -pne "s/\x47\xE9362H\x$HS\x18/\x47\xE9362H\x$HS\x1F/g" < $START_ELF.BACKUP > $START_ELF
+        # 2022 Fix
+        perl -pne "s/\x47\xE9\x3462H\x$HS\x18/\x47\xE9\x3462H\x$HS\x1F/g" < $START_ELF.BACKUP > $START_ELF
 
         echo "* Finished. success"
         echo "New md5sum: $(md5sum $START_ELF)"
@@ -174,6 +176,8 @@ elif [[ "$1" == "--reset-to-original" ]]; then
                 echo "* Patching Back"
                 cp -a $START_ELF $START_ELF.PATCHED
                 perl -pne "s/\x47\xE9362H\x$HS\x1F/\x47\xE9362H\x$HS\x18/g" < $START_ELF.PATCHED > $START_ELF
+                # 2022 Fix
+                perl -pne "s/\x47\xE9\x3462H\x$HS\x1F/\x47\xE9\x3462H\x$HS\x18/g" < $START_ELF.BACKUP > $START_ELF
         fi
 
         echo "* Finished. success"
