@@ -41,17 +41,17 @@ function _get_tools() {
 
 function _check4patched() {
         #_get_tools
-        echo "* First check mpeg2/vc activated?"
+        echo -e "\n[*] First check mpeg2/vc activated?"
         vcgencmd codec_enabled MPG2
         vcgencmd codec_enabled WVC1
         sleep 3 && echo
 
-        echo
-        echo "* Getting Hexstring... May take some time..."
+        echo "[+] Getting Hexstring... May take some time..."
         echo
         if [[ $(command -v xxd) ]]; then
-                HS=$(xxd $START_ELF | grep -Ei "47 *E9 *3(3|4) *36 *32 *48 *(3C|1D) *18" | sed -re 's/.*47\ *e9\ *3(3|4)\ *36\ *32\ *48\ (1d|3c)(18|1f)\ .*/\2/')
-                HT=$(xxd $START_ELF | grep -Ei "47 *E9 *3(3|4) *36 *32 *48 *(3C|1D) *18" | sed -re "s/.*47\ *e9\ *3(3|4)\ *36\ *32\ *48\ *$HS(..)\ .*/\2/")
+                HS=$(xxd $START_ELF | grep -Ei "47 *E9 *3(3|4) *36 *32 *48 *(3C|1D) *(18|1F)" | sed -re 's/.*47\ *e9\ *3(3|4)\ *36\ *32\ *48\ (1d|3c)(18|1f)\ .*/\2/')
+                HS_MODE=$(xxd $START_ELF | grep -Ei "47 *E9 *3(3|4) *36 *32 *48 *(3C|1D) *(18|1F)" | sed -re 's/.*47\ *e9\ *3(3|4)\ *36\ *32\ *48\ (1d|3c)(18|1f)\ .*/\1/')
+                HT=$(xxd $START_ELF | grep -Ei "47 *E9 *3(3|4) *36 *32 *48 *(3C|1D) *(18|1F)" | sed -re "s/.*47\ *e9\ *3(3|4)\ *36\ *32\ *48\ *$HS(..)\ .*/\2/")
         else
                 echo "xxd not found, trying to patch with 0x1D ? "
                 echo -n "If unsure please install xxd and stop now. continue? (y/n) : "
@@ -62,18 +62,18 @@ function _check4patched() {
         fi
 
         if [[ ! "$1" == "--check-only" ]]; then
-                if [[ $HT == "1f" ]]; then
-                        echo "* Already Patched (0x$HT)"
+                if [[ "$HT" == "1f" ]]; then
+                        echo "[~] Already Patched (0x$HT)"
                         sleep 4 && exit 0;
                 else
-                        echo "* Not patched (0x$HT) continue..."
+                        echo "[!] Not patched (0x$HT) continue..."
                         sleep 2
                 fi
         else
-                if [[ $HT == "1f" ]]; then
-                        echo "* Already Patched (0x$HT)"
+                if [[ "$HT" == "1f" ]]; then
+                        echo "[~] Already Patched (0x$HT)"
                 else
-                        echo "* Not patched! (0x$HT)"
+                        echo "[!] Not patched! (0x$HT)"
                         sleep 2
                 fi  
         fi
@@ -106,11 +106,11 @@ function _get_startelf() {
         fi
 }
 
-echo "   ____________________________________________________ "
-echo "  |><><><><><><><><><><><><><><><><><><><><><><><><><><|"
-echo "  |  raspi_mpeg_license_patch v0.3b - (c)2021 suuhm    |"
-echo "  |____________________________________________________|"
-echo "                                                        "
+echo "     ____________________________________________________ "
+echo "    |><><><><><><><><><><><><><><><><><><><><><><><><><><|"
+echo "    |  raspi_mpeg_license_patch v0.4b - (c)2022 suuhm    |"
+echo "    |____________________________________________________|"
+echo "                                                          "
 
 #if [[ $2 && "$2" =~ \-\-\o\s\=[a-z]*$ ]]; then
 #unknown =~ Regex operator in BusyBox v1.31.0 bash? ash-shell / 
@@ -123,13 +123,20 @@ if [[ "$1" == "--check-only" ]]; then
         _get_startelf $_COM $_OS
         _check4patched $1
         echo -e "\n\n* Check state xxd location +/- 1 line:"
-        xxd $START_ELF | grep -Ei -B 1 -A 1 "47 *E9 *3(3|4) *36 *32 *48 *(3C|1D)"
+        xxd $START_ELF | grep -Ei -B 1 -A 1 "47 *E9 *3(3|4) *36 *32 *48 *(3C|1D) *(18|1F)"
         echo ""
-        echo "* get GPUtemp every 5 secs... (STOP with Ctrl+C)"
-        while true; do gputemp; sleep 5; done
-        # libreelec some more stats pls uncomment here:
-        # bcmstat.sh d 23
-        exit 0
+        
+        echo -n "[?] Want you show some GPU temperature stats? (y/n) : "
+        read yn
+        if [[ $yn != "y" && $yn != "yes" ]]; then
+                exit 1;
+        else    
+                echo "* get GPUtemp every 5 secs... (STOP with Ctrl+C)"
+                while true; do gputemp; sleep 5; done
+                # libreelec some more stats pls uncomment here:
+                # bcmstat.sh d 23
+                exit 0
+        fi
         
 elif [[ "$1" == "--patch-now" ]]; then
         _get_startelf $_COM $_OS
@@ -140,24 +147,40 @@ elif [[ "$1" == "--patch-now" ]]; then
         # decode_WVC1=0x6d1feeff
         # decode_DTS=0x00000000
         # decode_DDP=0x00000000
-        echo "* set up patch now..."
+        HS=$(echo $HS | awk '{print toupper($0)}')
+        # tolower
+        # Or: HS=$(echo $HS | tr [:lower:] [:upper:])
+        echo -e "\n[*] set up patch now ($HS) ..."
         
         if [[ ! $(command -v perl) ]]; then
                 echo "perl not found, exit"
                 exit 1
         fi
         cp -a $START_ELF $START_ELF.BACKUP
-        perl -pne "s/\x47\xE9362H\x$HS\x18/\x47\xE9362H\x$HS\x1F/g" < $START_ELF.BACKUP > $START_ELF
-        # 2022 Fix
-        perl -pne "s/\x47\xE9\x3462H\x$HS\x18/\x47\xE9\x3462H\x$HS\x1F/g" < $START_ELF.BACKUP > $START_ELF
-
-        echo "* Finished. success"
+        if [ $HS_MODE -eq 3 ]; then
+                echo "[~] Using old patch ($HS_MODE) -> legacy"
+                perl -pne "s/\x47\xE9362H\x$HS\x18/\x47\xE9362H\x$HS\x1F/g" < $START_ELF.BACKUP > $START_ELF
+        elif [ $HS_MODE -eq 4 ]; then
+                echo "[~] Using > 2022 patch ($HS_MODE)"
+                perl -pne "s/\x47\xE9\x3462H\x$HS\x18/\x47\xE9\x3462H\x$HS\x1F/g" < $START_ELF.BACKUP > $START_ELF
+        else
+                echo "[!] Something went wrong, exit now.." ; exit 3
+        fi
+        
+        echo "[*] Finished. success"
         echo "New md5sum: $(md5sum $START_ELF)"
         echo "Old md5sum: $(md5sum $START_ELF.BACKUP)"
         mount -o remount,ro $(dirname $START_ELF)
         sleep 2
         echo ""
-        echo "* Now, pls restart your device and check again."
+        echo "[!] Now, pls restart your device and check again."
+        echo -n "Restart now? continue? (y/n) : "
+        read yn
+        if [[ $yn != "y" && $yn != "yes" ]]; then
+                exit 0;
+        else
+                reboot
+        fi
         
 elif [[ "$1" == "--reset-to-original" ]]; then
         _get_startelf $_COM $_OS
@@ -175,22 +198,33 @@ elif [[ "$1" == "--reset-to-original" ]]; then
         else
                 echo "* Patching Back"
                 cp -a $START_ELF $START_ELF.PATCHED
-                perl -pne "s/\x47\xE9362H\x$HS\x1F/\x47\xE9362H\x$HS\x18/g" < $START_ELF.PATCHED > $START_ELF
-                # 2022 Fix
-                perl -pne "s/\x47\xE9\x3462H\x$HS\x1F/\x47\xE9\x3462H\x$HS\x18/g" < $START_ELF.BACKUP > $START_ELF
+                if [ $HS_MODE -eq 3 ]; then
+                        echo "[~] Using old patch ($HS_MODE) -> legacy"
+                        perl -pne "s/\x47\xE9362H\x$HS\x1F/\x47\xE9362H\x$HS\x18/g" < $START_ELF.PATCHED > $START_ELF
+                elif [ $HS_MODE -eq 4 ]; then
+                        echo "[~] Using > 2022 patch ($HS_MODE)"
+                        perl -pne "s/\x47\xE9\x3462H\x$HS\x1F/\x47\xE9\x3462H\x$HS\x18/g" < $START_ELF.BACKUP > $START_ELF
+                else
+                        echo "[!] Something went wrong, exit now.." ; exit 3
         fi
 
-        echo "* Finished. success"
+        echo "[*] Finished. success"
         echo "New original md5sum: $(md5sum $START_ELF)"
         echo "Old Patched File md5sum: $(md5sum $START_ELF.PATCHED)"
         mount -o remount,ro $(dirname $START_ELF)
         sleep 2
         echo
-        echo "* Now, pls restart your device and check again."
-
+        echo "[!] Now, pls restart your device and check again."
+        echo -n "Restart now? continue? (y/n) : "
+        read yn
+        if [[ $yn != "y" && $yn != "yes" ]]; then
+                exit 0;
+        else
+                reboot
+        fi
 else 
-        echo -e "\n* No Arguments set: "
-        echo -e "\n* Usage: $0 [--check-only | --patch-now | --reset-to-original] [--os=<raspbian|libreelec|osmc|xbian>]\n"
+        echo -e "\n[!] No Arguments set: "
+        echo -e "\n* Usage: $0 --check-only | --patch-now | --reset-to-original [--os=<raspbian|libreelec|osmc|xbian>]\n"
         exit 1
 fi
 
