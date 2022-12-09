@@ -20,20 +20,20 @@ function _get_tools() {
         echo "* Getting some necessary tools, maybe this take some time..."
         mkdir -p /storage/sr-tools
         export PATH=$PATH:/storage/sr-tools
-        
+
         if [[ $(command -v xxd) ]] && [[ $(command -v perl) ]]; then
                 echo "Tools already just here, continue..."
                 return 1
         fi
-        
+
         find / | grep -i -E "bin/xxd$|bin/perl$" | xargs -I Z cp Z /storage/sr-tools
-        
-        if [[ ! $(command -v xxd) ]]; then
-                echo "xxd not found, but not neccessary for patching only.."
+
+        if [[ ! $(command -v xxd) ]] && [[ ! $(command -v hexdump) ]]; then
+                echo "xxd / hexdump not found, but not neccessary for patching only.."
         fi
-        
-        if [[ ! $(command -v perl) ]]; then
-                echo "perl not found, but not neccessary for checking only.."
+
+        if [[ ! $(command -v perl) ]] && [[ ! $(command -v sed) ]]; then
+                echo "perl / sed not found, but not neccessary for checking only.."
         fi
         #ln -s /storage/{xxd,perl} /storage/.kodi/addons/service.ttyd/bin/
         #cp -ra /var/media/root/usr/bin/{xxd,perl}/storage/
@@ -52,8 +52,15 @@ function _check4patched() {
                 HS=$(xxd $START_ELF | grep -Ei "47 *E9 *3(3|4) *36 *32 *48 *(3C|1D) *(18|1F)" | sed -re 's/.*47\ *e9\ *3(3|4)\ *36\ *32\ *48\ (1d|3c)(18|1f)\ .*/\2/')
                 HS_MODE=$(xxd $START_ELF | grep -Ei "47 *E9 *3(3|4) *36 *32 *48 *(3C|1D) *(18|1F)" | sed -re 's/.*47\ *e9\ *3(3|4)\ *36\ *32\ *48\ (1d|3c)(18|1f)\ .*/\1/')
                 HT=$(xxd $START_ELF | grep -Ei "47 *E9 *3(3|4) *36 *32 *48 *(3C|1D) *(18|1F)" | sed -re "s/.*47\ *e9\ *3(3|4)\ *36\ *32\ *48\ *$HS(..)\ .*/\2/")
+        elif [[ $(command -v hexdump) ]]; then
+                echo "Using hexdump (beta)"
+                # hexdump -v -e '6/2 "0x%x - ""\n"'
+                REGEX2=".*47\ *e9\ *3(3|4)\ *36\ *32\ *48\ *(1d|3c)\ *(18|1f)\ .*"
+                HS=$(hexdump -s 751391 -C $START_ELF | grep -Ei "$REGEX2" | sed -re "s/$REGEX2/\2/")
+                HS_MODE=$(hexdump -s 751391 -C $START_ELF | grep -Ei "$REGEX2" | sed -re "s/$REGEX2/\1/")
+                HT=$(hexdump -s 751391 -C $START_ELF | grep -Ei "$REGEX2" | sed -re "s/.*47\ *e9\ *3(3|4)\ *36\ *32\ *48\ *$HS\ *(..)\ .*/\2/")
         else
-                echo "xxd not found, trying to patch with 0x1D ? "
+                echo "xxd / hexdump not found, trying to patch with 0x1D ? "
                 echo -n "If unsure please install xxd and stop now. continue? (y/n) : "
                 read yn
                 if [[ $yn != "y" && $yn != "yes" ]]; then
@@ -75,7 +82,7 @@ function _check4patched() {
                 else
                         echo "[!] Not patched! (0x$HT)"
                         sleep 2
-                fi  
+                fi
         fi
 }
 
@@ -113,7 +120,7 @@ echo "    |____________________________________________________|"
 echo "                                                          "
 
 #if [[ $2 && "$2" =~ \-\-\o\s\=[a-z]*$ ]]; then
-#unknown =~ Regex operator in BusyBox v1.31.0 bash? ash-shell / 
+#unknown =~ Regex operator in BusyBox v1.31.0 bash? ash-shell /
 if [[ $2 ]]; then
         _OS=$2
         _COM=$1
@@ -122,22 +129,25 @@ fi
 if [[ "$1" == "--check-only" ]]; then
         _get_startelf $_COM $_OS
         _check4patched $1
-        echo -e "\n[~] Check state xxd location +/- 1 line:"
-        xxd $START_ELF | grep -Ei -B 1 -A 1 "47 *E9 *3(3|4) *36 *32 *48 *(3C|1D) *(18|1F)"
-        echo ""
+        echo -e "\n[~] Check state HEX location +/- 1 line:"
+        if [[ $(command -v xxd) ]]; then
+                xxd $START_ELF | grep -Ei -B 1 -A 1 "47 *E9 *3(3|4) *36 *32 *48 *(3C|1D) *(18|1F)"
+        else
+                hexdump -C $START_ELF | grep -Ei -B 1 -A 1 "$REGEX2" ; echo ""
+        fi
         
-        echo -n "[?] Want you show some GPU temperature stats? (y/n) : "
+        echo -en "\n[?] Want you show some GPU temperature stats? (y/n) : "
         read yn
         if [[ $yn != "y" && $yn != "yes" ]]; then
                 exit 1;
-        else    
+        else
                 echo "* get GPUtemp every 5 secs... (STOP with Ctrl+C)"
                 while true; do gputemp; sleep 5; done
                 # libreelec some more stats pls uncomment here:
                 # bcmstat.sh d 23
                 exit 0
         fi
-        
+
 elif [[ "$1" == "--patch-now" ]]; then
         _get_startelf $_COM $_OS
         _check4patched $1
@@ -151,22 +161,36 @@ elif [[ "$1" == "--patch-now" ]]; then
         # tolower
         # Or: HS=$(echo $HS | tr [:lower:] [:upper:])
         echo -e "\n[*] set up patch now ($HS) ..."
-        
-        if [[ ! $(command -v perl) ]]; then
-                echo "perl not found, exit"
+
+        if [[ ! $(command -v perl) ]] && [[ ! $(command -v sed) ]]; then
+                echo "perl/ sed  not found, exit"
                 exit 1
         fi
         cp -a $START_ELF $START_ELF.BACKUP
+        
+        # 0x33 Patch
         if [ $HS_MODE -eq 3 ]; then
                 echo "[~] Using old patch ($HS_MODE) -> legacy"
-                perl -pne "s/\x47\xE9362H\x$HS\x18/\x47\xE9362H\x$HS\x1F/g" < $START_ELF.BACKUP > $START_ELF
+                if [[ ! $(command -v perl) ]]; then
+                        perl -pne "s/\x47\xE9362H\x$HS\x18/\x47\xE9362H\x$HS\x1F/g" < $START_ELF.BACKUP > $START_ELF
+                else
+                        # sed - Escape: \x5c
+                        # ANSI-C Quoting
+                        eval sed "\$'s/\x47\xe9\x33\x36\x32\x48\x$HS\x18/\x47\xe9\x33\x36\x32\x48\x$HS\x1f/g'" $START_ELF.BACKUP > $START_ELF
+                fi
+                
+        # 0x34 Patch
         elif [ $HS_MODE -eq 4 ]; then
                 echo "[~] Using > 2022 patch ($HS_MODE)"
-                perl -pne "s/\x47\xE9\x3462H\x$HS\x18/\x47\xE9\x3462H\x$HS\x1F/g" < $START_ELF.BACKUP > $START_ELF
+                if [[ ! $(command -v perl) ]]; then
+                        perl -pne "s/\x47\xE9\x3462H\x$HS\x18/\x47\xE9\x3462H\x$HS\x1F/g" < $START_ELF.BACKUP > $START_ELF
+                else
+                        eval sed "\$'s/\x47\xe9\x34\x36\x32\x48\x$HS\x18/\x47\xe9\x34\x36\x32\x48\x$HS\x1f/g'" $START_ELF.BACKUP > $START_ELF
+                fi
         else
                 echo "[!] Something went wrong, exit now.." ; exit 3
         fi
-        
+
         echo "[*] Finished. success"
         echo "New md5sum: $(md5sum $START_ELF)"
         echo "Old md5sum: $(md5sum $START_ELF.BACKUP)"
@@ -181,15 +205,15 @@ elif [[ "$1" == "--patch-now" ]]; then
         else
                 reboot
         fi
-        
+
 elif [[ "$1" == "--reset-to-original" ]]; then
         _get_startelf $_COM $_OS
         _check4patched $1
         mount -o remount,rw $(dirname $START_ELF)
         echo "* Reset now..."
-        
-        if [[ ! $(command -v perl) ]]; then
-                echo "perl not found, exit"
+
+        if [[ ! $(command -v perl) ]] && [[ ! $(command -v sed) ]]; then
+                echo "perl/ sed  not found, exit"
                 exit 1
         fi
         if [[ -e $START_ELF.BACKUP ]]; then
@@ -198,12 +222,26 @@ elif [[ "$1" == "--reset-to-original" ]]; then
         else
                 echo -e "\n[!] Backup files not found. Need for patching Back" ; sleep 2
                 cp -a $START_ELF $START_ELF.PATCHED
+                
+                # 0x33 Patch
                 if [ $HS_MODE -eq 3 ]; then
                         echo "[~] Using old patch ($HS_MODE) -> legacy"
-                        perl -pne "s/\x47\xE9362H\x$HS\x1F/\x47\xE9362H\x$HS\x18/g" < $START_ELF.PATCHED > $START_ELF
+                        if [[ ! $(command -v perl) ]]; then
+                                perl -pne "s/\x47\xE9362H\x$HS\x1F/\x47\xE9362H\x$HS\x18/g" < $START_ELF.BACKUP > $START_ELF
+                        else
+                                # sed - Escape: \x5c
+                                # ANSI-C Quoting
+                                eval sed "\$'s/\x47\xe9\x33\x36\x32\x48\x$HS\x1f/\x47\xe9\x33\x36\x32\x48\x$HS\x18/g'" $START_ELF.BACKUP > $START_ELF
+                        fi
+
+                # 0x34 Patch
                 elif [ $HS_MODE -eq 4 ]; then
                         echo "[~] Using > 2022 patch ($HS_MODE)"
-                        perl -pne "s/\x47\xE9\x3462H\x$HS\x1F/\x47\xE9\x3462H\x$HS\x18/g" < $START_ELF.BACKUP > $START_ELF
+                        if [[ ! $(command -v perl) ]]; then
+                                perl -pne "s/\x47\xE9\x3462H\x$HS\x1F/\x47\xE9\x3462H\x$HS\x18/g" < $START_ELF.BACKUP > $START_ELF
+                        else
+                                eval sed "\$'s/\x47\xe9\x34\x36\x32\x48\x$HS\x1f/\x47\xe9\x34\x36\x32\x48\x$HS\x18/g'" $START_ELF.BACKUP > $START_ELF
+                        fi
                 else
                         echo "[!] Something went wrong, exit now.." ; exit 3
                 fi
@@ -212,7 +250,7 @@ elif [[ "$1" == "--reset-to-original" ]]; then
         echo -e "\n[*] Finished. success! \n"
         echo "New original md5sum: $(md5sum $START_ELF)"
         echo "Old Patched File md5sum: $(md5sum $START_ELF.PATCHED)"
-        
+
         mount -o remount,ro $(dirname $START_ELF)
         echo ; sleep 2
         echo "[!] Now, pls restart your device and check again."
@@ -223,7 +261,7 @@ elif [[ "$1" == "--reset-to-original" ]]; then
         else
                 reboot
         fi
-else 
+else
         echo -e "\n[!] No Arguments set: "
         echo -e "\n* Usage: $0 --check-only | --patch-now | --reset-to-original [--os=<raspbian|libreelec|osmc|xbian>]\n"
         exit 1
