@@ -49,16 +49,20 @@ function _check4patched() {
         echo "[+] Getting Hexstring... May take some time..."
         echo
         if [[ $(command -v xxd) ]]; then
+                echo "[*] Using xxd"
                 HS=$(xxd $START_ELF | grep -Ei "47 *E9 *3(3|4) *36 *32 *48 *(3C|1D) *(18|1F)" | sed -re 's/.*47\ *e9\ *3(3|4)\ *36\ *32\ *48\ (1d|3c)(18|1f)\ .*/\2/')
                 HS_MODE=$(xxd $START_ELF | grep -Ei "47 *E9 *3(3|4) *36 *32 *48 *(3C|1D) *(18|1F)" | sed -re 's/.*47\ *e9\ *3(3|4)\ *36\ *32\ *48\ (1d|3c)(18|1f)\ .*/\1/')
                 HT=$(xxd $START_ELF | grep -Ei "47 *E9 *3(3|4) *36 *32 *48 *(3C|1D) *(18|1F)" | sed -re "s/.*47\ *e9\ *3(3|4)\ *36\ *32\ *48\ *$HS(..)\ .*/\2/")
         elif [[ $(command -v hexdump) ]]; then
-                echo "Using hexdump (beta)"
+                echo "[*] Using hexdump (beta)"
                 # hexdump -v -e '6/2 "0x%x - ""\n"'
+                # Old hexdump HS-search
+                # hexdump -s 751391 -C $START_ELF | grep -Ei "$REGEX2"
                 REGEX2=".*47\ *e9\ *3(3|4)\ *36\ *32\ *48\ *(1d|3c)\ *(18|1f)\ .*"
-                HS=$(hexdump -s 751391 -C $START_ELF | grep -Ei "$REGEX2" | sed -re "s/$REGEX2/\2/")
-                HS_MODE=$(hexdump -s 751391 -C $START_ELF | grep -Ei "$REGEX2" | sed -re "s/$REGEX2/\1/")
-                HT=$(hexdump -s 751391 -C $START_ELF | grep -Ei "$REGEX2" | sed -re "s/.*47\ *e9\ *3(3|4)\ *36\ *32\ *48\ *$HS\ *(..)\ .*/\2/")
+                RUN_HEXDMP="hexdump -s 751391 -ve '1/1 \"%.2x \"' ${START_ELF}"
+                HS=$(eval $RUN_HEXDMP | grep -Eio "$REGEX2" | sed -re "s/$REGEX2/\2/")
+                HS_MODE=$(eval $RUN_HEXDMP | sed -re "s/$REGEX2/\1/")
+                HT=$(eval $RUN_HEXDMP | grep -Eio "$REGEX2" | sed -re "s/.*47\ *e9\ *3(3|4)\ *36\ *32\ *48\ *$HS\ *(..)\ .*/\2/")
         else
                 echo "xxd / hexdump not found, trying to patch with 0x1D ? "
                 echo -n "If unsure please install xxd and stop now. continue? (y/n) : "
