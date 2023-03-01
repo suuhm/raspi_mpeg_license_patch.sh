@@ -1,5 +1,15 @@
 #!/bin/bash
 #
+# raspi_mpeg_license_patch v0.4.2b - (c) 2023 suuhm 
+#
+# Changelog: 27.02.2023
+#
+# [+] Added: check4tools function for better performance
+# [+] Added: hexdump function for better grepping of hexstrings
+# [*] Modified Logo banner screen.
+# [*] Modified some bugfixes.
+#
+#
 # BASED AS SHELL PoC and HELPER ON:
 # https://github.com/nucular/raspi-keygen
 #
@@ -16,8 +26,59 @@
 #HS=3C
 HS=1D #> 0x1d
 
+function _get_startelf() {
+        if [[ -f /boot/start.elf && "$2" == "--os=raspbian" ]]; then
+                # On Raspbian:
+                START_ELF=/boot/start.elf
+        elif [[ -f /flash/start.elf && "$2" == "--os=libreelec" ]]; then
+                # On libreElec:
+                START_ELF=/flash/start.elf
+                _check4tools
+        elif [[ -f /boot/start_x.elf && "$2" == "--os=osmc" ]]; then
+                # On OSMC:
+                START_ELF=/boot/start_x.elf
+                _check4tools
+        elif [[ -f /boot/start.elf && "$2" == "--os=xbian" ]]; then
+                # On Xbian
+                START_ELF=/boot/start.elf
+                _check4tools
+        else
+                echo "START.ELF not found. Searching for possible files:"
+                echo -e "---------------------------------------------\n"
+                find / | grep -i -E "start.*.elf"
+                echo -e "\n---------------------------------------------"
+                echo -en "\nPlease enter the full Path to the START.ELF: "
+                read START_ELF
+                _check4tools
+        fi
+}
+
+function _check4tools() {
+        echo "[*] Checking for necessary tools, maybe this take some time..."
+        #not yet needable for export bin-path:
+        #mkdir -p /storage/sr-tools
+        #export PATH=$PATH:/storage/sr-tools
+        TM=0
+
+        if [[ ! $(command -v xxd) ]] && [[ ! $(command -v hexdump) ]]; then
+                echo "xxd / hexdump not found; try to get it from disk..."
+                TM=1
+        fi
+
+        if [[ ! $(command -v perl) ]] && [[ ! $(command -v sed) ]]; then
+                echo "perl / sed not found; try to get it from disk..."
+                TM=1
+        fi
+
+        if [[ $TM -gt 0 ]]; then
+                _get_tools
+        else
+                echo -e "\n[*] Found tools, continue."
+        fi
+}
+
 function _get_tools() {
-        echo "* Getting some necessary tools, maybe this take some time..."
+        echo "[*] Getting some necessary tools, maybe this take some time..."
         mkdir -p /storage/sr-tools
         export PATH=$PATH:/storage/sr-tools
 
@@ -26,7 +87,8 @@ function _get_tools() {
                 return 1
         fi
 
-        find / | grep -i -E "bin/xxd$|bin/perl$" | xargs -I Z cp Z /storage/sr-tools
+        # checking full ssd/sd/hdd for [s]bin directories and binaries
+        find / | grep -i -E "bin/xxd$|bin/hexdump$|bin/sed$|bin/perl$" | xargs -I Z cp Z /storage/sr-tools
 
         if [[ ! $(command -v xxd) ]] && [[ ! $(command -v hexdump) ]]; then
                 echo "xxd / hexdump not found, but not neccessary for patching only.."
@@ -49,16 +111,20 @@ function _check4patched() {
         echo "[+] Getting Hexstring... May take some time..."
         echo
         if [[ $(command -v xxd) ]]; then
+                echo "[*] Using xxd"
                 HS=$(xxd $START_ELF | grep -Ei "47 *E9 *3(3|4) *36 *32 *48 *(3C|1D) *(18|1F)" | sed -re 's/.*47\ *e9\ *3(3|4)\ *36\ *32\ *48\ (1d|3c)(18|1f)\ .*/\2/')
                 HS_MODE=$(xxd $START_ELF | grep -Ei "47 *E9 *3(3|4) *36 *32 *48 *(3C|1D) *(18|1F)" | sed -re 's/.*47\ *e9\ *3(3|4)\ *36\ *32\ *48\ (1d|3c)(18|1f)\ .*/\1/')
                 HT=$(xxd $START_ELF | grep -Ei "47 *E9 *3(3|4) *36 *32 *48 *(3C|1D) *(18|1F)" | sed -re "s/.*47\ *e9\ *3(3|4)\ *36\ *32\ *48\ *$HS(..)\ .*/\2/")
         elif [[ $(command -v hexdump) ]]; then
-                echo "Using hexdump (beta)"
+                echo "[*] Using hexdump (beta)"
                 # hexdump -v -e '6/2 "0x%x - ""\n"'
+                # Old hexdump HS-search
+                # hexdump -s 751391 -C $START_ELF | grep -Ei "$REGEX2"
                 REGEX2=".*47\ *e9\ *3(3|4)\ *36\ *32\ *48\ *(1d|3c)\ *(18|1f)\ .*"
-                HS=$(hexdump -s 751391 -C $START_ELF | grep -Ei "$REGEX2" | sed -re "s/$REGEX2/\2/")
-                HS_MODE=$(hexdump -s 751391 -C $START_ELF | grep -Ei "$REGEX2" | sed -re "s/$REGEX2/\1/")
-                HT=$(hexdump -s 751391 -C $START_ELF | grep -Ei "$REGEX2" | sed -re "s/.*47\ *e9\ *3(3|4)\ *36\ *32\ *48\ *$HS\ *(..)\ .*/\2/")
+                RUN_HEXDMP="hexdump -s 751391 -ve '1/1 \"%.2x \"' ${START_ELF}"
+                HS=$(eval $RUN_HEXDMP | grep -Eio "$REGEX2" | sed -re "s/$REGEX2/\2/")
+                HS_MODE=$(eval $RUN_HEXDMP | sed -re "s/$REGEX2/\1/")
+                HT=$(eval $RUN_HEXDMP | grep -Eio "$REGEX2" | sed -re "s/.*47\ *e9\ *3(3|4)\ *36\ *32\ *48\ *$HS\ *(..)\ .*/\2/")
         else
                 echo "xxd / hexdump not found, trying to patch with 0x1D ? "
                 echo -n "If unsure please install xxd and stop now. continue? (y/n) : "
@@ -86,38 +152,19 @@ function _check4patched() {
         fi
 }
 
-function _get_startelf() {
-        if [[ -f /boot/start.elf && "$2" == "--os=raspbian" ]]; then
-                # On Raspbian:
-                START_ELF=/boot/start.elf
-        elif [[ -f /flash/start.elf && "$2" == "--os=libreelec" ]]; then
-                # On libreElec:
-                START_ELF=/flash/start.elf
-                _get_tools
-        elif [[ -f /boot/start_x.elf && "$2" == "--os=osmc" ]]; then
-                # On OSMC:
-                START_ELF=/boot/start_x.elf
-                _get_tools
-        elif [[ -f /boot/start.elf && "$2" == "--os=xbian" ]]; then
-                # On Xbian
-                START_ELF=/boot/start.elf
-                _get_tools
-        else
-                echo "START.ELF not found. Searching for possible files:"
-                echo -e "---------------------------------------------\n"
-                find / | grep -i -E "start.*.elf"
-                echo -e "\n---------------------------------------------"
-                echo -en "\nPlease enter the full Path to the START.ELF: "
-                read START_ELF
-                _get_tools
-        fi
-}
-
-echo "     ____________________________________________________ "
-echo "    |><><><><><><><><><><><><><><><><><><><><><><><><><><|"
-echo "    |  raspi_mpeg_license_patch v0.4b - (c)2022 suuhm    |"
-echo "    |____________________________________________________|"
-echo "                                                          "
+#
+# MAIN ZONE
+#
+echo "     _________________________________________________________ "
+echo "    |><><><><><><><><><><><><><><><><><><><><><><><><><><><><>|"
+echo "    |                                                         |"
+echo "    |  raspi_mpeg_license_patch v0.4.2b - (c) 2023 suuhm      |"
+echo "    |                                                         |"
+echo "    |  !!! IMPORTANT NOTE !!!                                 |"
+echo "    |  PLEASE BUY THE LICENSES!                               |"
+echo "    |  THIS SCRIPT IS JUST FOR RECOVER CASES!                 |"
+echo "    |_________________________________________________________|"
+echo "                                                               "
 
 #if [[ $2 && "$2" =~ \-\-\o\s\=[a-z]*$ ]]; then
 #unknown =~ Regex operator in BusyBox v1.31.0 bash? ash-shell /
@@ -160,7 +207,7 @@ elif [[ "$1" == "--patch-now" ]]; then
         HS=$(echo $HS | awk '{print toupper($0)}')
         # tolower
         # Or: HS=$(echo $HS | tr [:lower:] [:upper:])
-        echo -e "\n[*] set up patch now ($HS) ..."
+        echo -e "\n[*] Start Patching ($HS) ..."
 
         if [[ ! $(command -v perl) ]] && [[ ! $(command -v sed) ]]; then
                 echo "perl/ sed  not found, exit"
@@ -170,34 +217,35 @@ elif [[ "$1" == "--patch-now" ]]; then
         
         # 0x33 Patch
         if [ $HS_MODE -eq 3 ]; then
-                echo "[~] Using old patch ($HS_MODE) -> legacy"
-                if [[ ! $(command -v perl) ]]; then
+                echo "[~] Using legacy patch (HS_MODE: $HS_MODE)"
+                if [[ $(command -v perl) ]]; then
                         perl -pne "s/\x47\xE9362H\x$HS\x18/\x47\xE9362H\x$HS\x1F/g" < $START_ELF.BACKUP > $START_ELF
                 else
                         # sed - Escape: \x5c
                         # ANSI-C Quoting
+                        echo -e "\n[!] perl not found - using sed:"
                         eval sed "\$'s/\x47\xe9\x33\x36\x32\x48\x$HS\x18/\x47\xe9\x33\x36\x32\x48\x$HS\x1f/g'" $START_ELF.BACKUP > $START_ELF
                 fi
                 
         # 0x34 Patch
         elif [ $HS_MODE -eq 4 ]; then
-                echo "[~] Using > 2022 patch ($HS_MODE)"
-                if [[ ! $(command -v perl) ]]; then
+                echo "[~] Using > 2022 patch (HS_MODE: $HS_MODE)"
+                if [[ $(command -v perl) ]]; then
                         perl -pne "s/\x47\xE9\x3462H\x$HS\x18/\x47\xE9\x3462H\x$HS\x1F/g" < $START_ELF.BACKUP > $START_ELF
                 else
+                        echo -e "\n[!] perl not found - using sed:"
                         eval sed "\$'s/\x47\xe9\x34\x36\x32\x48\x$HS\x18/\x47\xe9\x34\x36\x32\x48\x$HS\x1f/g'" $START_ELF.BACKUP > $START_ELF
                 fi
         else
                 echo "[!] Something went wrong, exit now.." ; exit 3
         fi
 
-        echo "[*] Finished. success"
+        echo -e "\n*********************\n\a[*] Finished. success\n"
         echo "New md5sum: $(md5sum $START_ELF)"
         echo "Old md5sum: $(md5sum $START_ELF.BACKUP)"
         mount -o remount,ro $(dirname $START_ELF)
-        sleep 2
-        echo ""
-        echo "[!] Now, pls restart your device and check again."
+        sleep 2; echo
+        echo -e "\n[!] Now, pls restart your device and check again.\n"
         echo -n "Restart now? continue? (y/n) : "
         read yn
         if [[ $yn != "y" && $yn != "yes" ]]; then
@@ -210,14 +258,15 @@ elif [[ "$1" == "--reset-to-original" ]]; then
         _get_startelf $_COM $_OS
         _check4patched $1
         mount -o remount,rw $(dirname $START_ELF)
-        echo "* Reset now..."
+        echo -e "\n[*] Reset now..."
 
         if [[ ! $(command -v perl) ]] && [[ ! $(command -v sed) ]]; then
                 echo "perl/ sed  not found, exit"
                 exit 1
         fi
         if [[ -e $START_ELF.BACKUP ]]; then
-                echo -e "\n[*] Finding old file.. $START_ELF.BACKUP" ; sleep 2
+                echo -e "\n[*] Found old Backup start.elf file.. $START_ELF.BACKUP" ; sleep 2
+                cp -a $START_ELF $START_ELF.PATCHED
                 cp -a $START_ELF.BACKUP $START_ELF
         else
                 echo -e "\n[!] Backup files not found. Need for patching Back" ; sleep 2
@@ -226,11 +275,12 @@ elif [[ "$1" == "--reset-to-original" ]]; then
                 # 0x33 Patch
                 if [ $HS_MODE -eq 3 ]; then
                         echo "[~] Using old patch ($HS_MODE) -> legacy"
-                        if [[ ! $(command -v perl) ]]; then
+                        if [[ $(command -v perl) ]]; then
                                 perl -pne "s/\x47\xE9362H\x$HS\x1F/\x47\xE9362H\x$HS\x18/g" < $START_ELF.BACKUP > $START_ELF
                         else
                                 # sed - Escape: \x5c
                                 # ANSI-C Quoting
+                                echo -e "\n[!] perl not found - using sed:"
                                 eval sed "\$'s/\x47\xe9\x33\x36\x32\x48\x$HS\x1f/\x47\xe9\x33\x36\x32\x48\x$HS\x18/g'" $START_ELF.BACKUP > $START_ELF
                         fi
 
@@ -240,6 +290,7 @@ elif [[ "$1" == "--reset-to-original" ]]; then
                         if [[ ! $(command -v perl) ]]; then
                                 perl -pne "s/\x47\xE9\x3462H\x$HS\x1F/\x47\xE9\x3462H\x$HS\x18/g" < $START_ELF.BACKUP > $START_ELF
                         else
+                                echo -e "\n[!] perl not found - using sed:"
                                 eval sed "\$'s/\x47\xe9\x34\x36\x32\x48\x$HS\x1f/\x47\xe9\x34\x36\x32\x48\x$HS\x18/g'" $START_ELF.BACKUP > $START_ELF
                         fi
                 else
@@ -247,7 +298,7 @@ elif [[ "$1" == "--reset-to-original" ]]; then
                 fi
         fi
 
-        echo -e "\n[*] Finished. success! \n"
+        echo -e "\n*********************\n\a[*] Finished. success\n"
         echo "New original md5sum: $(md5sum $START_ELF)"
         echo "Old Patched File md5sum: $(md5sum $START_ELF.PATCHED)"
 
@@ -262,7 +313,7 @@ elif [[ "$1" == "--reset-to-original" ]]; then
                 reboot
         fi
 else
-        echo -e "\n[!] No Arguments set: "
+        echo -e "\n\a[!] No Arguments set: "
         echo -e "\n* Usage: $0 --check-only | --patch-now | --reset-to-original [--os=<raspbian|libreelec|osmc|xbian>]\n"
         exit 1
 fi
