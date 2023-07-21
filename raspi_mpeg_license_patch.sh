@@ -112,16 +112,16 @@ function _check4patched() {
         echo
         if [[ $(command -v xxd) ]]; then
                 echo "[*] Using xxd"
-                HS=$(xxd $START_ELF | grep -Ei "47 *E9 *3(3|4) *36 *32 *48 *(3C|1D) *(18|1F)" | sed -re 's/.*47\ *e9\ *3(3|4)\ *36\ *32\ *48\ (1d|3c)(18|1f)\ .*/\2/')
-                HS_MODE=$(xxd $START_ELF | grep -Ei "47 *E9 *3(3|4) *36 *32 *48 *(3C|1D) *(18|1F)" | sed -re 's/.*47\ *e9\ *3(3|4)\ *36\ *32\ *48\ (1d|3c)(18|1f)\ .*/\1/')
-                HT=$(xxd $START_ELF | grep -Ei "47 *E9 *3(3|4) *36 *32 *48 *(3C|1D) *(18|1F)" | sed -re "s/.*47\ *e9\ *3(3|4)\ *36\ *32\ *48\ *$HS(..)\ .*/\2/")
+                HS=$(xxd -c 128 $START_ELF | grep -Ei "47 *E9 *3(3|4) *36 *32 *48 *(3C|1D) *(18|1F)" | sed -re 's/.*47\ *e9\ *3(3|4)\ *36\ *32\ *48\ (1d|3c)(18|1f)\ .*/\2/')
+                HS_MODE=$(xxd -c 128 $START_ELF | grep -Ei "47 *E9 *3(3|4) *36 *32 *48 *(3C|1D) *(18|1F)" | sed -re 's/.*47\ *e9\ *3(3|4)\ *36\ *32\ *48\ (1d|3c)(18|1f)\ .*/\1/')
+                HT=$(xxd -c 128 $START_ELF | grep -Ei "47 *E9 *3(3|4) *36 *32 *48 *(3C|1D) *(18|1F)" | sed -re "s/.*47\ *e9\ *3(3|4)\ *36\ *32\ *48\ *$HS(..)\ .*/\2/")
         elif [[ $(command -v hexdump) ]]; then
                 echo "[*] Using hexdump (beta)"
                 # hexdump -v -e '6/2 "0x%x - ""\n"'
                 # Old hexdump HS-search
                 # hexdump -s 751391 -C $START_ELF | grep -Ei "$REGEX2"
                 REGEX2=".*47\ *e9\ *3(3|4)\ *36\ *32\ *48\ *(1d|3c)\ *(18|1f)\ .*"
-                RUN_HEXDMP="hexdump -s 751391 -ve '1/1 \"%.2x \"' ${START_ELF}"
+                RUN_HEXDMP="hexdump -s 75139 -ve '1/1 \"%.2x \"' ${START_ELF}"
                 HS=$(eval $RUN_HEXDMP | grep -Eio "$REGEX2" | sed -re "s/$REGEX2/\2/")
                 HS_MODE=$(eval $RUN_HEXDMP | sed -re "s/$REGEX2/\1/")
                 HT=$(eval $RUN_HEXDMP | grep -Eio "$REGEX2" | sed -re "s/.*47\ *e9\ *3(3|4)\ *36\ *32\ *48\ *$HS\ *(..)\ .*/\2/")
@@ -178,7 +178,7 @@ if [[ "$1" == "--check-only" ]]; then
         _check4patched $1
         echo -e "\n[~] Check state HEX location +/- 1 line:"
         if [[ $(command -v xxd) ]]; then
-                xxd $START_ELF | grep -Ei -B 1 -A 1 "47 *E9 *3(3|4) *36 *32 *48 *(3C|1D) *(18|1F)"
+                xxd -c 128 $START_ELF | grep -Ei -B 1 -A 1 "47 *E9 *3(3|4) *36 *32 *48 *(3C|1D) *(18|1F)"
         else
                 hexdump -C $START_ELF | grep -Ei -B 1 -A 1 "$REGEX2" ; echo ""
         fi
