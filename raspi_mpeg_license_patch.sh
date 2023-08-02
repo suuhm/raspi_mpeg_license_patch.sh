@@ -4,10 +4,23 @@
 #
 # Changelog: 27.02.2023
 #
+# [*] Fixed some output bugs with hexdump/xxd
+# [*] Find / error handling performance fixes
+# [*] Some other performance updates
+#
+# Changelog: 27.02.2023
+#
 # [+] Added: check4tools function for better performance
 # [+] Added: hexdump function for better grepping of hexstrings
 # [*] Modified Logo banner screen.
 # [*] Modified some bugfixes.
+#
+# Force Checking with hexdump and/or patching with sed:
+# sed "s/command -v xxd/command -v xxd-false/g" -i raspi_mpeg_license_patch.sh
+# sed "s/command -v perl/command -v perl-false/g" -i raspi_mpeg_license_patch.sh
+# ---
+# sed "s/command -v xxd-false/command -v xxd/g" -i raspi_mpeg_license_patch.sh
+# sed "s/command -v perl/command -v perl-false/g" -i raspi_mpeg_license_patch.sh
 #
 #
 # BASED AS SHELL PoC and HELPER ON:
@@ -45,10 +58,14 @@ function _get_startelf() {
         else
                 echo "START.ELF not found. Searching for possible files:"
                 echo -e "---------------------------------------------\n"
-                find / | grep -i -E "start.*.elf"
+                find / 2>&1 | grep -i -E "start.*.elf"
+                TSTARTELF=$(find / 2>&1 | grep -i -E "start.*.elf" | head)
                 echo -e "\n---------------------------------------------"
-                echo -en "\nPlease enter the full Path to the START.ELF: "
+                echo -en "\nPlease enter the full Path to the START.ELF [$TSTARTELF]: "
                 read START_ELF
+                if [ -z $START_ELF ]; then
+                        START_ELF=$TSTARTELF
+                fi
                 _check4tools
         fi
 }
@@ -88,7 +105,7 @@ function _get_tools() {
         fi
 
         # checking full ssd/sd/hdd for [s]bin directories and binaries
-        find / | grep -i -E "bin/xxd$|bin/hexdump$|bin/sed$|bin/perl$" | xargs -I Z cp Z /storage/sr-tools
+        find / 2>&1 | grep -i -E "bin/xxd$|bin/hexdump$|bin/sed$|bin/perl$" | xargs -I Z cp Z /storage/sr-tools
 
         if [[ ! $(command -v xxd) ]] && [[ ! $(command -v hexdump) ]]; then
                 echo "xxd / hexdump not found, but not neccessary for patching only.."
@@ -112,22 +129,22 @@ function _check4patched() {
         echo
         if [[ $(command -v xxd) ]]; then
                 echo "[*] Using xxd"
-                HS=$(xxd $START_ELF | grep -Ei "47 *E9 *3(3|4) *36 *32 *48 *(3C|1D) *(18|1F)" | sed -re 's/.*47\ *e9\ *3(3|4)\ *36\ *32\ *48\ (1d|3c)(18|1f)\ .*/\2/')
-                HS_MODE=$(xxd $START_ELF | grep -Ei "47 *E9 *3(3|4) *36 *32 *48 *(3C|1D) *(18|1F)" | sed -re 's/.*47\ *e9\ *3(3|4)\ *36\ *32\ *48\ (1d|3c)(18|1f)\ .*/\1/')
-                HT=$(xxd $START_ELF | grep -Ei "47 *E9 *3(3|4) *36 *32 *48 *(3C|1D) *(18|1F)" | sed -re "s/.*47\ *e9\ *3(3|4)\ *36\ *32\ *48\ *$HS(..)\ .*/\2/")
+                HS=$(xxd -c 128 $START_ELF | grep -Ei "47 *E9 *3(3|4) *36 *32 *48 *(3C|1D) *(18|1F)" | sed -re 's/.*47\ *e9\ *3(3|4)\ *36\ *32\ *48\ (1d|3c)(18|1f)\ .*/\2/')
+                HS_MODE=$(xxd -c 128 $START_ELF | grep -Ei "47 *E9 *3(3|4) *36 *32 *48 *(3C|1D) *(18|1F)" | sed -re 's/.*47\ *e9\ *3(3|4)\ *36\ *32\ *48\ (1d|3c)(18|1f)\ .*/\1/')
+                HT=$(xxd -c 128 $START_ELF | grep -Ei "47 *E9 *3(3|4) *36 *32 *48 *(3C|1D) *(18|1F)" | sed -re "s/.*47\ *e9\ *3(3|4)\ *36\ *32\ *48\ *$HS(..)\ .*/\2/")
         elif [[ $(command -v hexdump) ]]; then
                 echo "[*] Using hexdump (beta)"
                 # hexdump -v -e '6/2 "0x%x - ""\n"'
                 # Old hexdump HS-search
                 # hexdump -s 751391 -C $START_ELF | grep -Ei "$REGEX2"
                 REGEX2=".*47\ *e9\ *3(3|4)\ *36\ *32\ *48\ *(1d|3c)\ *(18|1f)\ .*"
-                RUN_HEXDMP="hexdump -s 751391 -ve '1/1 \"%.2x \"' ${START_ELF}"
+                RUN_HEXDMP="hexdump -s 75139 -ve '1/1 \"%.2x \"' ${START_ELF}"
                 HS=$(eval $RUN_HEXDMP | grep -Eio "$REGEX2" | sed -re "s/$REGEX2/\2/")
                 HS_MODE=$(eval $RUN_HEXDMP | sed -re "s/$REGEX2/\1/")
                 HT=$(eval $RUN_HEXDMP | grep -Eio "$REGEX2" | sed -re "s/.*47\ *e9\ *3(3|4)\ *36\ *32\ *48\ *$HS\ *(..)\ .*/\2/")
         else
                 echo "xxd / hexdump not found, trying to patch with 0x1D ? "
-                echo -n "If unsure please install xxd and stop now. continue? (y/n) : "
+                echo -n "If unsure please install xxd and stop now. continue? (y/n) [n/N]: "
                 read yn
                 if [[ $yn != "y" && $yn != "yes" ]]; then
                         exit 1;
@@ -178,12 +195,13 @@ if [[ "$1" == "--check-only" ]]; then
         _check4patched $1
         echo -e "\n[~] Check state HEX location +/- 1 line:"
         if [[ $(command -v xxd) ]]; then
-                xxd $START_ELF | grep -Ei -B 1 -A 1 "47 *E9 *3(3|4) *36 *32 *48 *(3C|1D) *(18|1F)"
+                xxd -c 128 $START_ELF | grep -Ei -B 1 -A 1 "47 *E9 *3(3|4) *36 *32 *48 *(3C|1D) *(18|1F)"
         else
-                hexdump -C $START_ELF | grep -Ei -B 1 -A 1 "$REGEX2" ; echo ""
+                REGEXD="0x47\ 0xe9\ 0x3(3|4)\ 0x36\ 0x32\ 0x48\ 0x(1d|3c)\ 0x(18|1f)"
+                echo -e "\nHexdump Patchline => $(hexdump -s 75138 -e '1/1 "0x%.2x "' $START_ELF | grep -Eio "$REGEXD" | sed -r "s/.*($REGEXD).*/\1/")\n"
         fi
         
-        echo -en "\n[?] Want you show some GPU temperature stats? (y/n) : "
+        echo -en "\n[?] Want you show some GPU temperature stats? (y/n) [n/N]: "
         read yn
         if [[ $yn != "y" && $yn != "yes" ]]; then
                 exit 1;
