@@ -66,7 +66,7 @@ function _get_startelf() {
                 if [ -z $START_ELF ]; then
                         START_ELF=$TSTARTELF
                 fi
-                _check4tools
+                echo; _check4tools
         fi
 }
 
@@ -96,6 +96,7 @@ function _check4tools() {
 
 function _get_tools() {
         echo "[*] Getting some necessary tools, maybe this take some time..."
+        echo; sleep 1
         mkdir -p /storage/sr-tools
         export PATH=$PATH:/storage/sr-tools
 
@@ -121,6 +122,7 @@ function _get_tools() {
 function _check4patched() {
         #_get_tools
         echo -e "\n[*] First check mpeg2/vc activated?"
+        echo; sleep 2
         vcgencmd codec_enabled MPG2
         vcgencmd codec_enabled WVC1
         sleep 3 && echo
@@ -182,6 +184,7 @@ echo "    |  PLEASE BUY THE LICENSES!                               |"
 echo "    |  THIS SCRIPT IS JUST FOR RECOVER CASES!                 |"
 echo "    |_________________________________________________________|"
 echo "                                                               "
+echo; sleep 2
 
 #if [[ $2 && "$2" =~ \-\-\o\s\=[a-z]*$ ]]; then
 #unknown =~ Regex operator in BusyBox v1.31.0 bash? ash-shell /
