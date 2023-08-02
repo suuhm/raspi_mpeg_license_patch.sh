@@ -9,6 +9,13 @@
 # [*] Modified Logo banner screen.
 # [*] Modified some bugfixes.
 #
+# Force Checking with hexdump and/or patching with sed:
+# sed "s/command -v xxd/command -v xxd-false/g" -i raspi_mpeg_license_patch.sh
+# sed "s/command -v perl/command -v perl-false/g" -i raspi_mpeg_license_patch.sh
+# ---
+# sed "s/command -v xxd-false/command -v xxd/g" -i raspi_mpeg_license_patch.sh
+# sed "s/command -v perl/command -v perl-false/g" -i raspi_mpeg_license_patch.sh
+#
 #
 # BASED AS SHELL PoC and HELPER ON:
 # https://github.com/nucular/raspi-keygen
@@ -180,7 +187,8 @@ if [[ "$1" == "--check-only" ]]; then
         if [[ $(command -v xxd) ]]; then
                 xxd -c 128 $START_ELF | grep -Ei -B 1 -A 1 "47 *E9 *3(3|4) *36 *32 *48 *(3C|1D) *(18|1F)"
         else
-                hexdump -C $START_ELF | grep -Ei -B 1 -A 1 "$REGEX2" ; echo ""
+                REGEXD="0x47\ 0xe9\ 0x3(3|4)\ 0x36\ 0x32\ 0x48\ 0x(1d|3c)\ 0x(18|1f)"
+                echo -e "\nHexdump Patchline => $(hexdump -s 75138 -e '1/1 "0x%.2x "' $START_ELF | grep -Eio "$REGEXD" | sed -r "s/.*($REGEXD).*/\1/")\n"
         fi
         
         echo -en "\n[?] Want you show some GPU temperature stats? (y/n) : "
