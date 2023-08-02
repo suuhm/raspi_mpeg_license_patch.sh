@@ -59,7 +59,7 @@ function _get_startelf() {
                 echo "START.ELF not found. Searching for possible files:"
                 echo -e "---------------------------------------------\n"
                 find / 2>&1 | grep -i -E "start.*.elf"
-                TSTARTELF=$(find / 2>&1 | grep -i -E "start.*.elf" | head)
+                TSTARTELF=$(find / 2>&1 | grep -i -E ".*start.*.elf" | head -n1)
                 echo -e "\n---------------------------------------------"
                 echo -en "\nPlease enter the full Path to the START.ELF [$TSTARTELF]: "
                 read START_ELF
