@@ -1,6 +1,12 @@
 # raspi_mpeg_license_patch.sh
 Simple hack & proof of concept script to activate (forgotten) mpeg2 and VC codec licenses on raspberry pi 
 
+[![Join Discord](https://img.shields.io/badge/Discord-Join%20Server-5865F2?style=for-the-badge&logo=discord&logoColor=white)](https://discord.gg/2tRn7GWTRm)
+[![Stars](https://img.shields.io/github/stars/suuhm/raspi_mpeg_license_patch.sh?color=gold&style=for-the-badge&logo=github)](https://github.com/suuhm/raspi_mpeg_license_patch.sh)
+[![Forks](https://img.shields.io/github/forks/suuhm/raspi_mpeg_license_patch.sh?color=silver&style=for-the-badge&logo=github)](https://github.com/suuhm/raspi_mpeg_license_patch.sh/network)
+[![Issues](https://img.shields.io/github/issues/suuhm/raspi_mpeg_license_patch.sh?color=red&style=for-the-badge&logo=github)](https://github.com/suuhm/raspi_mpeg_license_patch.sh/issues)
+[![PRs](https://img.shields.io/github/issues-pr/suuhm/raspi_mpeg_license_patch.sh?color=orange&style=for-the-badge&logo=github)](https://github.com/suuhm/raspi_mpeg_license_patch.sh/pulls)
+
 ### BASED AS SHELL Proof of Concept and HELPER ON:
 https://github.com/nucular/raspi-keygen
 
